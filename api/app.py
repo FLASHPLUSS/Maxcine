@@ -17,7 +17,7 @@ generos = {
 }
 
 # Cache temporário
-cache_temporario = []
+cache_temporario = {}
 ultima_atualizacao = 0
 intervalo_cache = 5 * 60  # Cache de 5 minutos
 
@@ -50,52 +50,27 @@ def extrair_links(genero_id):
         else:
             break
 
-    return filmes_links
-
-def extrair_informacoes_filme(url_filme):
-    """Extrai informações detalhadas de um filme específico em tempo real."""
-    response = requests.get(url_filme)
-    if response.status_code != 200:
-        return None
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    titulo = soup.select_one('.titulo h1').text.strip() if soup.select_one('.titulo h1') else None
-    capa = soup.select_one('.poster-m img')['src'] if soup.select_one('.poster-m img') else None
-    banner = soup.select_one('.backdrop')['style'] if soup.select_one('.backdrop') else None
-    ano = soup.select_one('.informacoes li strong').text.strip() if soup.select_one('.informacoes li strong') else None
-    sinopse = soup.select_one('.sinopse p').text.strip() if soup.select_one('.sinopse p') else None
-    generos_filme = [gen.text.strip() for gen in soup.select('.genero span')]
-    
-    return {
-        "titulo": titulo,
-        "capa": capa,
-        "banner": banner,
-        "ano": ano,
-        "sinopse": sinopse,
-        "generos": generos_filme
-    }
-
-def buscar_filmes_tempo_real():
-    """Busca todos os filmes de todas as categorias em tempo real."""
-    filmes_detalhados = []
-    for genero_id in generos:
-        links_filmes = extrair_links(genero_id)
-        for link in links_filmes:
-            filme_info = extrair_informacoes_filme(link)
-            if filme_info:
-                filmes_detalhados.append(filme_info)
-
-    return filmes_detalhados
+    return list(filmes_links)
 
 @app.route('/api/filmes', methods=['GET'])
 def todos_filmes():
     global ultima_atualizacao, cache_temporario
-    # Atualiza cache se o intervalo expirou
+
+    # Atualiza o cache se o intervalo expirou
     if time.time() - ultima_atualizacao > intervalo_cache:
-        cache_temporario = buscar_filmes_tempo_real()
+        cache_temporario = {}
+        for genero_id in generos:
+            links_filmes = extrair_links(genero_id)
+            cache_temporario[generos[genero_id]] = links_filmes
         ultima_atualizacao = time.time()
 
     return jsonify(cache_temporario)
 
 # Inicializa o cache com dados em tempo real
-cache_temporario = buscar_filmes_tempo_real()
+cache_temporario = {}
+for genero_id in generos:
+    links_filmes = extrair_links(genero_id)
+    cache_temporario[generos[genero_id]] = links_filmes
+
+if __name__ == "__main__":
+    app.run(debug=True)
