@@ -64,7 +64,7 @@ def extrair_links(genero_selecionado):
     return list(filmes_links)
 
 # Rota para pegar os links de filmes de um gênero
-@app.route('/filmes', methods=['GET'])
+@app.route('/api/filmes', methods=['GET'])
 def get_filmes():
     genero = request.args.get('genero', type=int)
     
