@@ -90,7 +90,7 @@ def atualizar_cache():
     ultima_atualizacao = time.time()
     print("Cache atualizado com sucesso.")
 
-@app.route('/filmes', methods=['GET'])
+@app.route('/api/filmes', methods=['GET'])
 def filmes():
     global ultima_atualizacao
     if time.time() - ultima_atualizacao > intervalo_atualizacao:
