@@ -16,8 +16,8 @@ generos = {
     10402: "Música", 10749: "Romance", 10751: "Família", 10752: "Guerra", 10770: "Cinema TV"
 }
 
-# Cache temporário
-cache_temporario = {}
+# Cache temporário para os links
+cache_filmes_links = []
 ultima_atualizacao = 0
 intervalo_cache = 5 * 60  # Cache de 5 minutos
 
@@ -54,23 +54,24 @@ def extrair_links(genero_id):
 
 @app.route('/api/filmes', methods=['GET'])
 def todos_filmes():
-    global ultima_atualizacao, cache_temporario
+    global ultima_atualizacao, cache_filmes_links
 
     # Atualiza o cache se o intervalo expirou
     if time.time() - ultima_atualizacao > intervalo_cache:
-        cache_temporario = {}
+        cache_filmes_links = []
         for genero_id in generos:
             links_filmes = extrair_links(genero_id)
-            cache_temporario[generos[genero_id]] = links_filmes
+            cache_filmes_links.extend(links_filmes)  # Adiciona todos os links em uma única lista
         ultima_atualizacao = time.time()
 
-    return jsonify(cache_temporario)
+    # Retorna todos os links de filmes em uma única lista
+    return jsonify(cache_filmes_links)
 
 # Inicializa o cache com dados em tempo real
-cache_temporario = {}
+cache_filmes_links = []
 for genero_id in generos:
     links_filmes = extrair_links(genero_id)
-    cache_temporario[generos[genero_id]] = links_filmes
+    cache_filmes_links.extend(links_filmes)
 
 if __name__ == "__main__":
     app.run(debug=True)
