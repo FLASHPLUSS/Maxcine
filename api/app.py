@@ -35,8 +35,11 @@ def extrair_links(genero_selecionado):
     filmes_links = set()  # Usar um conjunto para evitar duplicações
     page = 1
 
+    print(f"\nExtraindo filmes do gênero: {generos[genero_selecionado]}")  # Exibe o gênero atual
+
     while True:
         url = f'{base_url}?genre={genero_selecionado}&page={page}'
+        print(f"Buscando na URL: {url}")  # Adiciona log da URL atual
 
         response = requests.get(url)
 
@@ -45,6 +48,7 @@ def extrair_links(genero_selecionado):
             series_list = soup.find_all('div', class_='series-list')
 
             if not series_list:
+                print(f"Nenhuma série encontrada para o gênero {generos[genero_selecionado]}.")
                 break
 
             for series in series_list:
@@ -54,14 +58,18 @@ def extrair_links(genero_selecionado):
                     if filme_link:
                         filmes_links.add(filme_link)  # Adiciona o link ao conjunto (evitando duplicatas)
 
+            print(f'Links extraídos da página {page}: {len(filmes_links)} filmes encontrados.')
+
             next_page = soup.select_one('.pagination a:-soup-contains("Próxima")')
             if next_page and 'href' in next_page.attrs:
                 page += 1
             else:
                 break
         else:
+            print(f'Erro ao acessar a página: {response.status_code}')
             break
 
+    print(f"Total de links extraídos para o gênero {generos[genero_selecionado]}: {len(filmes_links)}")
     return filmes_links
 
 # Rota para retornar os links de filmes
@@ -73,6 +81,8 @@ def get_filmes_links():
     for genero_selecionado in generos.keys():
         filmes_links = extrair_links(genero_selecionado)
         todos_os_links.extend(filmes_links)  # Adiciona todos os links extraídos
+
+    print(f"Total de links extraídos: {len(todos_os_links)}")  # Log de total de links extraídos
 
     return jsonify(list(todos_os_links))
 
