@@ -31,37 +31,30 @@ generos = {
 }
 
 # Função para extrair links de filmes de uma categoria
-def extrair_links(genero_selecionado):
-    filmes_links = set()  # Usar um conjunto para evitar duplicações
-    page = 1
+def extrair_links_em_tempo_real(genero_selecionado):
+    url = f'{base_url}?genre={genero_selecionado}'  # URL direta para o gênero selecionado
+    response = requests.get(url)
 
-    while True:
-        url = f'{base_url}?genre={genero_selecionado}&page={page}'
-        response = requests.get(url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        series_list = soup.find_all('div', class_='series-list')  # Encontrando o conteúdo da lista de filmes
 
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            series_list = soup.find_all('div', class_='series-list')
+        filmes_links = set()  # Usar um conjunto para evitar duplicações
 
-            if not series_list:
-                break
+        if not series_list:
+            return None  # Retorna None se não encontrar filmes
 
-            for series in series_list:
-                links = series.find_all('a')  # Ajuste conforme a estrutura do HTML
-                for link in links:
-                    filme_link = link.get('href')
-                    if filme_link:
-                        filmes_links.add(filme_link)  # Adiciona o link ao conjunto (evitando duplicatas)
+        # Extrai os links dos filmes
+        for series in series_list:
+            links = series.find_all('a')  # Ajuste conforme a estrutura do HTML
+            for link in links:
+                filme_link = link.get('href')
+                if filme_link:
+                    filmes_links.add(filme_link)  # Adiciona o link ao conjunto (evitando duplicatas)
 
-            next_page = soup.select_one('.pagination a:-soup-contains("Próxima")')
-            if next_page and 'href' in next_page.attrs:
-                page += 1
-            else:
-                break
-        else:
-            break
-
-    return list(filmes_links)
+        return list(filmes_links)  # Retorna os links em formato de lista
+    else:
+        return None  # Caso a requisição falhe
 
 # Rota para pegar os links de filmes de um gênero
 @app.route('/api/filmes', methods=['GET'])
@@ -71,7 +64,11 @@ def get_filmes():
     if genero not in generos:
         return jsonify({"error": "Gênero inválido"}), 400
 
-    filmes_links = extrair_links(genero)
+    filmes_links = extrair_links_em_tempo_real(genero)
+    
+    if filmes_links is None:
+        return jsonify({"error": "Não foi possível extrair os filmes ou a página não foi encontrada"}), 404
+
     return jsonify({
         "genero": generos[genero],
         "filmes": filmes_links
