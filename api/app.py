@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import requests
 from bs4 import BeautifulSoup
 
@@ -37,7 +37,6 @@ def extrair_links(genero_selecionado):
 
     while True:
         url = f'{base_url}?genre={genero_selecionado}&page={page}'
-
         response = requests.get(url)
 
         if response.status_code == 200:
@@ -62,19 +61,21 @@ def extrair_links(genero_selecionado):
         else:
             break
 
-    return filmes_links
+    return list(filmes_links)
 
-@app.route('/api/filmes', methods=['GET'])
+# Rota para pegar os links de filmes de um gênero
+@app.route('/filmes', methods=['GET'])
 def get_filmes():
-    todos_os_links = []
+    genero = request.args.get('genero', type=int)
+    
+    if genero not in generos:
+        return jsonify({"error": "Gênero inválido"}), 400
 
-    # Extração dos links de filmes para todas as categorias
-    for genero_selecionado in generos.keys():
-        filmes_links = extrair_links(genero_selecionado)
-        todos_os_links.extend(filmes_links)
-
-    # Retorna os links extraídos como resposta na rota
-    return jsonify({'filmes_links': list(todos_os_links)})
+    filmes_links = extrair_links(genero)
+    return jsonify({
+        "genero": generos[genero],
+        "filmes": filmes_links
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
