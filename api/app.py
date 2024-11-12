@@ -1,3 +1,5 @@
+# api/app.py
+
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -5,7 +7,7 @@ import time
 
 app = Flask(__name__)
 
-# URL base e configurações
+# Configurações e variáveis para cache e categorias
 base_url = 'https://wix.maxcine.top/public/filmes'
 generos = {
     12: "Aventura", 14: "Fantasia", 16: "Animação", 18: "Drama", 27: "Terror",
@@ -14,12 +16,10 @@ generos = {
     10402: "Música", 10749: "Romance", 10751: "Família", 10752: "Guerra", 10770: "Cinema TV"
 }
 
-# Cache para armazenar dados e o tempo de última atualização
 cache_filmes = {}
 ultima_atualizacao = 0
 intervalo_atualizacao = 7 * 24 * 60 * 60  # 7 dias em segundos
 
-# Função para extrair links de filmes de uma categoria com paginação
 def extrair_links(genero_id):
     filmes_links = set()
     page = 1
@@ -50,7 +50,6 @@ def extrair_links(genero_id):
 
     return filmes_links
 
-# Função para extrair informações de cada filme, incluindo o gênero
 def extrair_informacoes_filme(url_filme):
     response = requests.get(url_filme)
     if response.status_code != 200:
@@ -62,8 +61,6 @@ def extrair_informacoes_filme(url_filme):
     banner = soup.select_one('.backdrop')['style'] if soup.select_one('.backdrop') else None
     ano = soup.select_one('.informacoes li strong').text.strip() if soup.select_one('.informacoes li strong') else None
     sinopse = soup.select_one('.sinopse p').text.strip() if soup.select_one('.sinopse p') else None
-
-    # Extrair gêneros (assumindo que eles estejam listados em uma classe ou div específica)
     generos_filme = [gen.text.strip() for gen in soup.select('.genero span')]
     
     return {
@@ -75,7 +72,6 @@ def extrair_informacoes_filme(url_filme):
         "generos": generos_filme
     }
 
-# Função para atualizar o cache
 def atualizar_cache():
     global cache_filmes, ultima_atualizacao
     cache_filmes = {}
@@ -94,15 +90,12 @@ def atualizar_cache():
     ultima_atualizacao = time.time()
     print("Cache atualizado com sucesso.")
 
-# Rota para acessar informações dos filmes
 @app.route('/filmes', methods=['GET'])
 def filmes():
     global ultima_atualizacao
-    # Atualiza o cache se passou mais de 7 dias desde a última atualização
     if time.time() - ultima_atualizacao > intervalo_atualizacao:
         atualizar_cache()
 
     return jsonify(cache_filmes)
 
-# Inicializar o cache na primeira execução
-atualizar_cache()  # Atualiza o cache ao iniciar o servidor
+atualizar_cache()
