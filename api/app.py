@@ -7,7 +7,7 @@ import time
 
 app = Flask(__name__)
 
-# Configurações iniciais
+# Configurações e variáveis para cache e categorias
 base_url = 'https://wix.maxcine.top/public/filmes'
 generos = {
     12: "Aventura", 14: "Fantasia", 16: "Animação", 18: "Drama", 27: "Terror",
@@ -16,42 +16,58 @@ generos = {
     10402: "Música", 10749: "Romance", 10751: "Família", 10752: "Guerra", 10770: "Cinema TV"
 }
 
-cache_filmes = []
+# Cache de links de filmes por categoria
+cache_links_filmes = {}
+# Cache de informações completas de todos os filmes
+cache_informacoes_filmes = []
 ultima_atualizacao = 0
-intervalo_atualizacao = 7 * 24 * 60 * 60  # Atualização a cada 7 dias
+intervalo_atualizacao = 7 * 24 * 60 * 60  # 7 dias em segundos
 
-def extrair_links_filmes():
-    filmes_links = set()  # Usar um set para evitar filmes duplicados
+def extrair_links(genero_id):
+    """Extrai links dos filmes de uma categoria específica."""
+    filmes_links = set()
+    page = 1
 
-    for genero_id in generos.keys():
-        page = 1
-        while True:
-            url = f'{base_url}?genre={genero_id}&page={page}'
-            response = requests.get(url)
-            if response.status_code != 200:
-                break
+    while True:
+        url = f'{base_url}?genre={genero_id}&page={page}'
+        response = requests.get(url)
+        if response.status_code != 200:
+            break
 
-            soup = BeautifulSoup(response.text, 'html.parser')
-            series_list = soup.find_all('div', class_='series-list')
-            if not series_list:
-                break
+        soup = BeautifulSoup(response.text, 'html.parser')
+        series_list = soup.find_all('div', class_='series-list')
+        if not series_list:
+            break
 
-            for series in series_list:
-                links = series.find_all('a')
-                for link in links:
-                    filme_link = link.get('href')
-                    if filme_link:
-                        filmes_links.add(filme_link)
+        for series in series_list:
+            links = series.find_all('a')
+            for link in links:
+                filme_link = link.get('href')
+                if filme_link:
+                    filmes_links.add(filme_link)
 
-            next_page = soup.select_one('.pagination a:-soup-contains("Próxima")')
-            if next_page and 'href' in next_page.attrs:
-                page += 1
-            else:
-                break
+        next_page = soup.select_one('.pagination a:-soup-contains("Próxima")')
+        if next_page and 'href' in next_page.attrs:
+            page += 1
+        else:
+            break
 
     return filmes_links
 
+def atualizar_cache_links():
+    """Atualiza o cache com os links dos filmes por categoria."""
+    global cache_links_filmes, ultima_atualizacao
+    cache_links_filmes = {}
+
+    for genero_id, genero_nome in generos.items():
+        links_filmes = extrair_links(genero_id)
+        cache_links_filmes[genero_nome] = links_filmes
+
+    ultima_atualizacao = time.time()
+    print("Cache de links atualizado com sucesso.")
+
 def extrair_informacoes_filme(url_filme):
+    """Extrai informações detalhadas de um filme específico."""
     response = requests.get(url_filme)
     if response.status_code != 200:
         return None
@@ -73,30 +89,29 @@ def extrair_informacoes_filme(url_filme):
         "generos": generos_filme
     }
 
-def atualizar_cache():
-    global cache_filmes, ultima_atualizacao
-    cache_filmes = []
+def atualizar_cache_informacoes():
+    """Atualiza o cache com as informações detalhadas de todos os filmes."""
+    global cache_informacoes_filmes
+    cache_informacoes_filmes = []
 
-    # Extrai os links de todos os filmes das categorias e armazena sem duplicados
-    links_filmes = extrair_links_filmes()
+    for genero_nome, links in cache_links_filmes.items():
+        for link in links:
+            filme_info = extrair_informacoes_filme(link)
+            if filme_info:
+                cache_informacoes_filmes.append(filme_info)
 
-    # Extrai as informações de cada filme e adiciona ao cache
-    for link in links_filmes:
-        filme_info = extrair_informacoes_filme(link)
-        if filme_info:
-            cache_filmes.append(filme_info)
+    print("Cache de informações de filmes atualizado com sucesso.")
 
-    ultima_atualizacao = time.time()
-    print("Cache atualizado com sucesso.")
-
-@app.route('/filmes', methods=['GET'])
-def filmes():
+@app.route('/api/filmes', methods=['GET'])
+def todos_filmes():
     global ultima_atualizacao
-    # Atualiza o cache a cada 7 dias
+    # Atualiza o cache se o intervalo de atualização expirou
     if time.time() - ultima_atualizacao > intervalo_atualizacao:
-        atualizar_cache()
+        atualizar_cache_links()
+        atualizar_cache_informacoes()
 
-    return jsonify(cache_filmes)
+    return jsonify(cache_informacoes_filmes)
 
-# Atualiza o cache ao iniciar a aplicação
-atualizar_cache()
+# Atualiza os caches ao iniciar a aplicação
+atualizar_cache_links()
+atualizar_cache_informacoes()
