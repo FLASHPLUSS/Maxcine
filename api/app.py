@@ -7,7 +7,7 @@ import time
 
 app = Flask(__name__)
 
-# Configurações e variáveis para cache e categorias
+# URL base do site
 base_url = 'https://wix.maxcine.top/public/filmes'
 generos = {
     12: "Aventura", 14: "Fantasia", 16: "Animação", 18: "Drama", 27: "Terror",
@@ -16,15 +16,13 @@ generos = {
     10402: "Música", 10749: "Romance", 10751: "Família", 10752: "Guerra", 10770: "Cinema TV"
 }
 
-# Cache de links de filmes por categoria
-cache_links_filmes = {}
-# Cache de informações completas de todos os filmes
-cache_informacoes_filmes = []
+# Cache temporário
+cache_temporario = []
 ultima_atualizacao = 0
-intervalo_atualizacao = 7 * 24 * 60 * 60  # 7 dias em segundos
+intervalo_cache = 5 * 60  # Cache de 5 minutos
 
 def extrair_links(genero_id):
-    """Extrai links dos filmes de uma categoria específica."""
+    """Extrai links de filmes de uma categoria específica em tempo real."""
     filmes_links = set()
     page = 1
 
@@ -54,20 +52,8 @@ def extrair_links(genero_id):
 
     return filmes_links
 
-def atualizar_cache_links():
-    """Atualiza o cache com os links dos filmes por categoria."""
-    global cache_links_filmes, ultima_atualizacao
-    cache_links_filmes = {}
-
-    for genero_id, genero_nome in generos.items():
-        links_filmes = extrair_links(genero_id)
-        cache_links_filmes[genero_nome] = links_filmes
-
-    ultima_atualizacao = time.time()
-    print("Cache de links atualizado com sucesso.")
-
 def extrair_informacoes_filme(url_filme):
-    """Extrai informações detalhadas de um filme específico."""
+    """Extrai informações detalhadas de um filme específico em tempo real."""
     response = requests.get(url_filme)
     if response.status_code != 200:
         return None
@@ -89,29 +75,27 @@ def extrair_informacoes_filme(url_filme):
         "generos": generos_filme
     }
 
-def atualizar_cache_informacoes():
-    """Atualiza o cache com as informações detalhadas de todos os filmes."""
-    global cache_informacoes_filmes
-    cache_informacoes_filmes = []
-
-    for genero_nome, links in cache_links_filmes.items():
-        for link in links:
+def buscar_filmes_tempo_real():
+    """Busca todos os filmes de todas as categorias em tempo real."""
+    filmes_detalhados = []
+    for genero_id in generos:
+        links_filmes = extrair_links(genero_id)
+        for link in links_filmes:
             filme_info = extrair_informacoes_filme(link)
             if filme_info:
-                cache_informacoes_filmes.append(filme_info)
+                filmes_detalhados.append(filme_info)
 
-    print("Cache de informações de filmes atualizado com sucesso.")
+    return filmes_detalhados
 
 @app.route('/api/filmes', methods=['GET'])
 def todos_filmes():
-    global ultima_atualizacao
-    # Atualiza o cache se o intervalo de atualização expirou
-    if time.time() - ultima_atualizacao > intervalo_atualizacao:
-        atualizar_cache_links()
-        atualizar_cache_informacoes()
+    global ultima_atualizacao, cache_temporario
+    # Atualiza cache se o intervalo expirou
+    if time.time() - ultima_atualizacao > intervalo_cache:
+        cache_temporario = buscar_filmes_tempo_real()
+        ultima_atualizacao = time.time()
 
-    return jsonify(cache_informacoes_filmes)
+    return jsonify(cache_temporario)
 
-# Atualiza os caches ao iniciar a aplicação
-atualizar_cache_links()
-atualizar_cache_informacoes()
+# Inicializa o cache com dados em tempo real
+cache_temporario = buscar_filmes_tempo_real()
